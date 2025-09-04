@@ -43,3 +43,6 @@ Na_in = 10.0
 Na_out = 145.0
 Cl_in = 4.0
 Cl_out = 110.0
+
+# Membrane capacitance
+C_m = 1.0   # µF/cm²
