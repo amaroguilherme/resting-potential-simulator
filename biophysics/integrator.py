@@ -5,7 +5,7 @@
 """
 import numpy as np
 
-from model import rhs
+from biophysics.model import rhs
 from scipy.integrate import odeint 
 
 def run_simulation(V0, t_start, t_end, dt,

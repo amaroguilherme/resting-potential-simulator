@@ -2,7 +2,7 @@
 This file will gather all the functions that calculate the electrical currents across the membrane. 
 Each current contributes to the variation of the membrane potential (dV/dt) in the biophysical model.
 """
-from math_helpers import michaelis_menten
+from helpers.math_helpers import michaelis_menten
 
 
 def leak_current(V, g_ion, E_ion):

@@ -1,7 +1,7 @@
 # main.py
 
-from protocols import baseline_protocol, current_step_protocol, k_out_ramp_protocol
-from analysis import plot_voltage_trace, compute_steady_state_voltage
+from protocols.protocols import baseline_protocol, current_step_protocol, k_out_ramp_protocol
+from protocols.analysis import plot_voltage_trace, compute_steady_state_voltage
 
 def main():
     t, V = baseline_protocol()

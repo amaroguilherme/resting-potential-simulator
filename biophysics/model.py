@@ -2,7 +2,7 @@
     Define the mathematical model of the neuron, that is, the differential equation 
     that describes how the membrane potential V changes over time.
 """
-from constants import C_m
+from biophysics.constants import C_m
 
 def rhs(V, t, t_start_stim=0.0, t_end_stim=0.0, I_inj=0.0):
     """

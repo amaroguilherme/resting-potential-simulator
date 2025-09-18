@@ -1,6 +1,6 @@
 import math
 
-from constants import K_mNa, K_mK
+from biophysics.constants import K_mNa, K_mK
 
 def nernst(out_conc, in_conc, z=1):
     return (61/z) * math.log10(out_conc/in_conc)

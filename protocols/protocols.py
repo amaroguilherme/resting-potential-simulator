@@ -7,7 +7,7 @@
     These functions do not solve the ODE directly; they configure the parameters and call the integrator (run_simulation).
 """
 import numpy as np
-from integrator import run_simulation
+from biophysics.integrator import run_simulation
 
 
 def baseline_protocol():
