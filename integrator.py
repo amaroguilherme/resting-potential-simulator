@@ -9,7 +9,7 @@ from model import rhs
 from scipy.integrate import odeint 
 
 def run_simulation(V0, t_start, t_end, dt,
-                   t_start_stim=None, t_end_stim=None, I_inj=0):
+                   t_start_stim=0.0, t_end_stim=0.0, I_inj=0.0):
     """
         Integrates the entire model over time, transforming the derivative dV/dt (calculated in the rhs function)
         into a complete trajectory of the membrane potential V(t).
@@ -21,7 +21,6 @@ def run_simulation(V0, t_start, t_end, dt,
     """
     
     t = np.arange(t_start, t_end, dt)
-    V_solution = odeint(rhs(V0, t, t_start_stim,
-                            t_end_stim, I_inj))
+    V_solution = odeint(rhs, V0, t, args=(t_start_stim, t_end_stim, I_inj))
     
-    return (t, V_solution.flatten())
+    return t, V_solution[:, 0]
