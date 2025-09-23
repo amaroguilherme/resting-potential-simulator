@@ -17,7 +17,7 @@ np.random.seed(seed)
 param_names = list(PARAM_RANGES_DICT.keys())
 N_parameters = len(param_names)
 
-t = np.arange(t_start, t_end + dt, dt)
+t = np.arange(t_start, t_end, dt)
 N_timepoints = len(t)
 
 X_array = np.zeros((N_samples, N_parameters))

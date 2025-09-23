@@ -23,7 +23,7 @@ def run_simulation(V0, X_i, t_start, t_end, dt,
 
     g_K, g_Na, g_Cl, K_out, K_in, Na_out, Na_in = X_i[:7]
 
-    t = np.arange(t_start, t_end + dt, dt)
+    t = np.arange(t_start, t_end, dt)
 
     V = odeint(
         rhs, V0, t,

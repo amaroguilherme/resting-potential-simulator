@@ -47,64 +47,49 @@ class MLPModel(BaseModel):
 
 
 class RNNModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers=1, dropout=0.0):
-        """
-        RNN-based model (LSTM) to predict membrane potential trajectories.
+    """
+    RNN-based model (LSTM) to predict membrane potential trajectories.
 
-        Args:
-            input_dim (int): Number of input features (bio-physical parameters).
-            hidden_dim (int): Hidden size of the LSTM.
-            output_dim (int): Number of outputs per timestep (usually 1 for V(t)).
-            num_layers (int): Number of stacked LSTM layers.
-            dropout (float): Dropout rate between LSTM layers.
-        """
+    Args:
+        input_dim (int): Number of input features (bio-physical parameters).
+        hidden_dim (int): Hidden size of the LSTM.
+        output_dim (int): Number of outputs per timestep (usually 1 for V(t)).
+        num_layers (int): Number of stacked LSTM layers.
+        dropout (float): Dropout rate between LSTM layers.
+    """
+    def __init__(self, input_dim, hidden_dim, output_dim=1, n_layers=1, dropout=0.0):
         super(RNNModel, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
 
-        self.encoder = nn.Linear(input_dim, hidden_dim)
-
-        self.lstm = nn.LSTM(
-            input_size=1,       # feed a dummy "time signal" at each step
+        self.rnn = nn.RNN(
+            input_size=input_dim,
             hidden_size=hidden_dim,
-            num_layers=num_layers,
+            num_layers=n_layers,
             batch_first=True,
-            dropout=dropout if num_layers > 1 else 0.0
+            dropout=dropout
         )
+        
+        self.fc = nn.Linear(hidden_dim, output_dim)
 
-        self.decoder = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, x, seq_len):
+    def forward(self, X, seq_len):
         """
         Forward pass of the RNN model.
 
         Args:
-            x (torch.Tensor): Input parameters of shape (batch_size, input_dim).
+            X (torch.Tensor): Input parameters of shape (batch_size, input_dim).
             seq_len (int): Length of the output trajectory (number of timesteps).
 
         Returns:
-            torch.Tensor: Predicted trajectories of shape (batch_size, seq_len, output_dim).
+            torch.Tensor: Predicted trajectories of shape (batch_size, seq_len).
         """
-        batch_size = x.size(0)
 
-        h0 = torch.tanh(self.encoder(x))
-        h0 = h0.unsqueeze(0)
-        c0 = torch.zeros_like(h0)
+        X_seq = X.unsqueeze(1).repeat(1, seq_len, 1)
 
-        dummy_input = torch.zeros(batch_size, seq_len, 1, device=x.device)
+        out, _ = self.rnn(X_seq)
 
-        lstm_out, _ = self.lstm(dummy_input, (h0, c0))
+        Y_pred = self.fc(out).squeeze(-1)
 
-        out = self.decoder(lstm_out)
+        return Y_pred
 
-        return out
-
-
-def get_model(name, **kwargs):
-    """
-    Factory method to instantiate models by name.
-    """
-    if name == "mlp":
-        return MLPModel(**kwargs)
-    elif name == "rnn":
-        return RNNModel(**kwargs)
-    else:
-        raise ValueError(f"Unknown model: {name}")
