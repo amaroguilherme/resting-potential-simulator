@@ -10,7 +10,7 @@ from ml.models import MLPModel, RNNModel
 
 
 SEED = 42
-MODEL_NAME = "rnn"        # "mlp" or "rnn"
+MODEL_NAME = "RNN"        # "MLP" or "RNN"
 BATCH_SIZE = 64
 EPOCHS = 50
 LEARNING_RATE = 1e-3
@@ -69,7 +69,7 @@ def evaluate(model, dataloader, criterion):
 def main():
     torch.manual_seed(SEED)
 
-    X, Y, t, param_names = load_dataset()
+    X, Y, _, _ = load_dataset()
     (X_train, Y_train), (X_val, Y_val), (X_test, Y_test) = split_dataset(X, Y)
 
     input_dim = X_train.shape[1]
@@ -102,7 +102,15 @@ def main():
     test_loss = evaluate(model, test_loader, criterion)
     print(f"Final Test Loss: {test_loss:.6f}")
 
-    torch.save(model.state_dict(), f"models/final_model_{MODEL_NAME}.pt")
+    torch.save({
+        "model_state": model.state_dict(),
+        "input_dim": input_dim,
+        "hidden_dim": model.hidden_dim,
+        "output_dim": 1,
+        "num_layers": model.n_layers,
+        "model_type": MODEL_NAME
+    }, f"models/final_model_{MODEL_NAME}.pt")
+
     print("Model saved in 'models/'.")
 
 if __name__ == "__main__":
