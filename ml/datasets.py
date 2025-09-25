@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 
 def load_dataset():
@@ -39,19 +40,30 @@ def get_dataloader(dataset, batch_size=64, shuffle=True):
         shuffle=shuffle)
 
 
-class RestingPotentialDataset(torch.utils.data.Dataset):
-    def __init__(self, X, Y):
-        assert len(X) == len(Y)
-        self.X = X
-        self.Y = Y
-        
-        
+class TrajectoryDataset(torch.utils.data.Dataset):
+    def __init__(self, X, Y, seq_len=5):
+        """
+        Args:
+            X (np.ndarray): shape (num_trajectories, traj_len)
+            Y (np.ndarray): same shape as X
+            seq_len (int): window size
+        """
+        self.sequences = []
+        self.targets = []
+        self.seq_len = seq_len
+
+        for traj in range(X.shape[0]):
+            traj_X = X[traj]
+            traj_Y = Y[traj]
+            for i in range(len(traj_X) - seq_len):
+                self.sequences.append(traj_X[i:i+seq_len])
+                self.targets.append(traj_Y[i+seq_len])
+
+        self.sequences = torch.tensor(self.sequences, dtype=torch.float32).unsqueeze(-1)
+        self.targets = torch.tensor(self.targets, dtype=torch.float32)
+
     def __len__(self):
-        return len(self.X)
-    
-    
+        return len(self.sequences)
+
     def __getitem__(self, idx):
-        X_tensor = torch.tensor(self.X[idx], dtype=torch.float32)
-        Y_tensor = torch.tensor(self.Y[idx], dtype=torch.float32)
-        
-        return X_tensor, Y_tensor
+        return self.sequences[idx], self.targets[idx]

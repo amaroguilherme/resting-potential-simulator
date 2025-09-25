@@ -47,31 +47,37 @@ class MLPModel(BaseModel):
 
 
 class RNNModel(nn.Module):
-    """
-    RNN-based model (LSTM) to predict membrane potential trajectories.
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers=1, model_type="RNN"):
+        """
+        RNN-based model for predicting time-dependent membrane potential trajectories.
 
-    Args:
-        input_dim (int): Number of input features (bio-physical parameters).
-        hidden_dim (int): Hidden size of the LSTM.
-        output_dim (int): Number of outputs per timestep (usually 1 for V(t)).
-        num_layers (int): Number of stacked LSTM layers.
-        dropout (float): Dropout rate between LSTM layers.
-    """
-    def __init__(self, input_dim, hidden_dim, output_dim=1, n_layers=1, dropout=0.0):
+        Args:
+            input_dim (int): Number of input parameters (excluding time).
+            hidden_dim (int): Dimension of hidden state in the RNN.
+            output_dim (int): Number of output dimensions (e.g., 1 for membrane potential).
+            num_layers (int): Number of RNN layers.
+            model_type (str): Type of recurrent layer ("RNN", "LSTM", "GRU").
+        """
         super(RNNModel, self).__init__()
+
+        self.input_dim = input_dim
         self.hidden_dim = hidden_dim
-        self.n_layers = n_layers
+        self.output_dim = output_dim
+        self.num_layers = num_layers
+        self.model_type = model_type
 
-        self.rnn = nn.RNN(
-            input_size=input_dim,
-            hidden_size=hidden_dim,
-            num_layers=n_layers,
-            batch_first=True,
-            dropout=dropout
-        )
-        
+        rnn_input_dim = input_dim + 1  
+
+        if model_type == "RNN":
+            self.rnn = nn.RNN(rnn_input_dim, hidden_dim, num_layers, batch_first=True)
+        elif model_type == "LSTM":
+            self.rnn = nn.LSTM(rnn_input_dim, hidden_dim, num_layers, batch_first=True)
+        elif model_type == "GRU":
+            self.rnn = nn.GRU(rnn_input_dim, hidden_dim, num_layers, batch_first=True)
+        else:
+            raise ValueError("Invalid model_type. Choose 'RNN', 'LSTM', or 'GRU'.")
+
         self.fc = nn.Linear(hidden_dim, output_dim)
-
 
     def forward(self, X, seq_len):
         """
@@ -84,12 +90,39 @@ class RNNModel(nn.Module):
         Returns:
             torch.Tensor: Predicted trajectories of shape (batch_size, seq_len).
         """
+        batch_size = X.size(0)
 
         X_seq = X.unsqueeze(1).repeat(1, seq_len, 1)
 
-        out, _ = self.rnn(X_seq)
+        t_values = torch.linspace(0, 1, seq_len, device=X.device).unsqueeze(0).unsqueeze(-1)
+        t_seq = t_values.repeat(batch_size, 1, 1)
+
+        X_with_time = torch.cat([X_seq, t_seq], dim=-1)
+
+        out, _ = self.rnn(X_with_time)
 
         Y_pred = self.fc(out).squeeze(-1)
 
         return Y_pred
+    
+    
+class LSTMModel(nn.Module):
+    def __init__(self, input_dim, hidden_dim=128, num_layers=1, dropout=0.2):
+        super(LSTMModel, self).__init__()
+        self.lstm = nn.LSTM(input_size=input_dim,
+                            hidden_size=hidden_dim,
+                            num_layers=num_layers,
+                            batch_first=True,
+                            dropout=dropout if num_layers > 1 else 0.0)
+        self.fc = nn.Sequential(
+            nn.Linear(hidden_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1)
+        )
 
+    def forward(self, x_seq):
+        out, _ = self.lstm(x_seq)
+        last_out = out[:, -1, :]
+        y_pred = self.fc(last_out)
+        return y_pred.squeeze(-1)
+    
