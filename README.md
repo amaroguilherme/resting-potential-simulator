@@ -1,9 +1,12 @@
 # Resting Potential Simulator
 **Simulating and Learning Neuronal Resting Potential Dynamics with Physics and AI**
 
+## Publication
+[![DOI](https://zenodo.org/badge/1050006043.svg)](https://doi.org/10.5281/zenodo.17211127)
+
 ## 📌 Overview
 This project combines **biophysical modeling** and **deep learning** to simulate and predict the resting membrane potential of neurons.  
-We start with a **deterministic model** based on ion gradients and membrane conductances, then extend it with a **Neural ODE** implemented in PyTorch to learn the voltage dynamics directly from data.
+We start with a **deterministic model** based on ion gradients and membrane conductances, then extend it with an **LSTM neural network** implemented in PyTorch to learn the voltage dynamics directly from data.
 
 The goal is to create a **hybrid neuroscience + AI framework** that can:  
 - Accurately simulate membrane potential dynamics.  
@@ -15,9 +18,10 @@ The goal is to create a **hybrid neuroscience + AI framework** that can:
 - Calculation of reversal potentials using **Nernst** and **GHK** equations  
 - Time integration using **SciPy ODE solvers**  
 - Dataset generation for machine learning  
-- Neural ODE implementation with **PyTorch + torchdiffeq**  
+- LSTM implementation with **PyTorch**  
 - Visualization and comparison of physical vs learned dynamics  
 - Modular structure for extensions (e.g., active channels, multi-compartment models)  
+- Experiment results saved in CSV and figures generated for analysis  
 
 ## 🧠 Scientific Background
 The **resting membrane potential** of a neuron is the stable voltage across its membrane at rest, typically around **-70 mV**.  
@@ -32,30 +36,34 @@ We model:
 - **Nernst equation** for reversal potentials  
 - **GHK equation** for resting potential estimate  
 
-Later, we train a **Neural ODE** to learn this dynamic behavior from data.
+Later, we train an **LSTM neural network** to learn this dynamic behavior from data.
 
 ## 📘 Usage
 1) Generate Dataset for AI
 ```
-python src/data_generator.py --n_samples 1000 --output data/dataset.npz
+python -m dataset.data_generator
 ```
 
-2) Train the Neural ODE
+2) Train the LSTM
 ```
-python src/experiments/train_neural_ode.py --config params/training_config.yml
-```
-
-3) Compare Models
-```
-python src/experiments/compare_vs_physical.py
+python -m ml.train
 ```
 
-4) Run the Biophysical Model (optional)
+3) Trajectory prediction and evaluation
 ```
-python src/experiments/run_physical_model.py
+python -m ml.evaluate
 ```
+
+4) Compare Models and Generate Figures
+```
+python -m ml.train_experiments
+```
+
 
 ## 📊 Example Results
-- Physical model: V_rest ≈ -70 mV under standard conditions
-- Neural ODE: RMSE < 1 mV after training
-- Speed-up: Neural ODE predicts trajectories faster than SciPy ODE solver
+- Physical model: V_rest ≈ -70 mV under standard conditions  
+- LSTM: RMSE < 1 mV after training  
+- Speed-up: LSTM predicts trajectories faster than SciPy ODE solver  
+- Experiment results saved in `experiment_results.csv`  
+- Figures generated for visualization of dynamics and comparison
+
