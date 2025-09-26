@@ -1,140 +1,70 @@
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
-import numpy as np
-from sklearn.metrics import r2_score
+from ml.models import LSTMModel
+from ml.datasets import load_dataset, TrajectoryDataset
 
-from ml.datasets import RestingPotentialDataset, load_dataset, split_dataset
-from ml.models import MLPModel, RNNModel
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def evaluate_model(model, dataloader, criterion, device):
+def predict_full_trajectory(model, init_seq, steps=500, output_idx=0):
     """
-    Evaluate the model on a given dataloader (validation or test).
+    Predicts a full trajectory autoregressively while keeping input features aligned.
 
     Args:
-        model: Trained model.
-        dataloader: DataLoader containing X and Y.
-        criterion: Loss function (e.g., nn.MSELoss).
-        device: Device to run evaluation (cpu or cuda).
-
+        model: trained LSTMModel
+        init_seq (torch.Tensor): Initial sequence, shape (1, seq_len, input_dim)
+        steps (int): Number of steps to predict
+        output_idx (int): Index of the feature that model predicts (usually membrane potential)
     Returns:
-        (mse, rmse, r2): Evaluation metrics.
+        List of predicted values (membrane potential)
     """
     model.eval()
-    mse_losses = []
-    y_true_all, y_pred_all = [], []
+    preds = []
 
-    with torch.no_grad():
-        for X_batch, Y_batch in dataloader:
-            X_batch = X_batch.to(device)
-            Y_batch = Y_batch.to(device)
+    seq = init_seq.clone()
 
-            Y_pred = model(X_batch, seq_len=Y_batch.shape[1])
-
-            loss = criterion(Y_pred, Y_batch)
-            mse_losses.append(loss.item())
-
-            # collect predictions for R²
-            y_true_all.append(Y_batch.cpu().numpy())
-            y_pred_all.append(Y_pred.cpu().numpy())
-
-    y_true_all = np.concatenate(y_true_all, axis=0)
-    y_pred_all = np.concatenate(y_pred_all, axis=0)
-
-    mse = np.mean(mse_losses)
-    rmse = np.sqrt(mse)
-    r2 = r2_score(y_true_all.flatten(), y_pred_all.flatten())
-
-    return mse, rmse, r2
-
-
-def plot_predictions(model, dataset, t, device, n_samples=5):
-    """
-    Plot model predictions compared to ground truth trajectories.
-
-    Args:
-        model: Trained model.
-        dataset: Test dataset.
-        t: Time vector (ms).
-        device: Device to run evaluation (cpu or cuda).
-        n_samples: Number of samples to plot.
-    """
-    model.eval()
-    indices = np.random.choice(len(dataset), size=n_samples, replace=False)
-
-    plt.figure(figsize=(12, 8))
-    for i, idx in enumerate(indices, 1):
-        X, Y_true = dataset[idx]
-        X = X.unsqueeze(0).to(device)  # add batch dimension
-        Y_true = Y_true.numpy()
-
+    for _ in range(steps):
         with torch.no_grad():
-            Y_pred = model(X, seq_len=Y_true.shape[0])
-            Y_pred = Y_pred.squeeze(0).cpu().numpy()
+            y_pred = model(seq)
 
-        plt.subplot(n_samples, 1, i)
-        plt.plot(t, Y_true, label="Ground Truth", color="black")
-        plt.plot(t, Y_pred, label="Prediction", color="red", linestyle="--")
-        plt.ylabel("Membrane Potential (mV)")
-        if i == 1:
-            plt.legend()
-        if i == n_samples:
-            plt.xlabel("Time (ms)")
+        preds.append(y_pred.item())
 
-    plt.suptitle("Comparison: Ground Truth vs. Predicted Trajectories")
-    plt.tight_layout()
-    plt.show()
+        next_step = seq[:, -1, :].clone()
+        next_step[:, output_idx] = y_pred
+
+        seq = torch.cat([seq[:, 1:, :], next_step.unsqueeze(1)], dim=1)
+
+    return preds
 
 
 def main():
-    model_path = "models/final_model_rnn.pt"
-    batch_size = 64
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    X, Y, _, _ = load_dataset()
+    seq_len = min(50, X.shape[1])
+    dataset = TrajectoryDataset(X, Y, seq_len=seq_len)
 
-    X, Y, t, _ = load_dataset()
-    (_, _), (_, _), (X_test, Y_test) = split_dataset(X, Y)
+    checkpoint = torch.load("models/best_model_lstm.pth", map_location=DEVICE)
+    input_dim = checkpoint.get("input_dim", 11)
+    hidden_dim = checkpoint.get("hidden_dim", 256)
+    num_layers = checkpoint.get("num_layers", 2)
 
-    test_dataset = RestingPotentialDataset(X_test, Y_test)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    checkpoint = torch.load(model_path, map_location=device)
-    if checkpoint["model_type"] == "RNN":
-        model = RNNModel(
-            input_dim=checkpoint["input_dim"],
-            hidden_dim=checkpoint["hidden_dim"],
-            output_dim=checkpoint["output_dim"],
-            n_layers=checkpoint["num_layers"]
-        )
-    elif checkpoint["model_type"] == "MLP":
-        model = MLPModel(
-            input_dim=checkpoint["input_dim"],
-            hidden_dim=checkpoint["hidden_dim"],
-            output_dim=checkpoint["output_dim"]
-        )
-    else:
-        raise ValueError(f"Unknown model type: {checkpoint['model_type']}")
-    
-    input_dim = X.shape[1]
-    output_dim = 1
-
-    # Choose the same model architecture as used during training
-    model = RNNModel(input_dim=input_dim, hidden_dim=128, output_dim=output_dim, n_layers=1)
-
+    model = LSTMModel(input_dim=input_dim, hidden_dim=hidden_dim, num_layers=num_layers).to(DEVICE)
     model.load_state_dict(checkpoint["model_state"])
-    model.to(device)
 
-    # Quantitative evaluation
-    criterion = nn.MSELoss()
-    mse, rmse, r2 = evaluate_model(model, test_loader, criterion, device)
-    print(f"Test set results:")
-    print(f"MSE:  {mse:.6f}")
-    print(f"RMSE: {rmse:.6f}")
-    print(f"R²:   {r2:.4f}")
+    x_input, _ = dataset[0]
+    init_seq = x_input.unsqueeze(0).to(DEVICE)
 
-    # Qualitative evaluation (plots)
-    plot_predictions(model, test_dataset, t, device, n_samples=5)
+    preds = predict_full_trajectory(model, init_seq, steps=500)
+
+    true_curve = Y[0][:500]
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(true_curve, label="Ground Truth")
+    plt.plot(preds, label="Prediction", linestyle="--")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Membrane Potential (mV)")
+    plt.legend()
+    plt.title("Predicted vs Ground Truth Membrane Potential")
+    plt.show()
 
 
 if __name__ == "__main__":
